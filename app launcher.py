@@ -1,6 +1,7 @@
 import subprocess
 import os
 import json
+from rapidfuzz import fuzz
 
 def getAppsList():
     subprocess.run(
@@ -47,9 +48,35 @@ def find_name(alias):
         appList = json.load(f)
     for item in appList:
         if alias in item["Aliases"]:
-            return item["Name"]
+            return item["AppID"]
     return None
 
+def fuzzyMatch(key):
+    with open("AppsList.json","r", encoding="utf-8-sig") as f:
+        appList = json.load(f)
+    bestMatch = None
+    bestScore = 0
+
+    for app in appList:
+        for alias in app["Aliases"]:
+            score = fuzz.ratio(key,alias)
+
+            if score > bestScore:
+                bestScore = score
+                bestMatch = app["AppID"]
+                # bestMatch = {
+                #     "matched_alias":alias,
+                #     "score":score,
+                #     "app" : app
+                # }
+    return bestMatch
+
+def run(app):
+    command = f"explorer \"shell:AppsFolder\\{app}\""
+    subprocess.run(
+        ["powershell","-Command",command],
+        text=True
+    )
 
 
 
@@ -64,5 +91,12 @@ print("(Command should be in format \"open Appname\")")
 command = input().split(" ",1)
 app=normalize(command[1])
 print(app)
-print(find_name(app))
-# agar find name none return kare to fuzzy match use karna he varna run karna he
+match = find_name(app)
+print(match)
+
+if(match==None):
+    match = fuzzyMatch(app)
+    print(match)
+
+
+run(match)
