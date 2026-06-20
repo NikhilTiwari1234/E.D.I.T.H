@@ -1,32 +1,39 @@
 import subprocess
 import os
 import json
-from rapidfuzz import fuzz
+try:
+    from rapidfuzz import fuzz
+except ImportError:
+    print("Install rapidfuzz: pip install rapidfuzz")
+    exit()
+
 
 def getAppsList():
-    subprocess.run(
+    result = subprocess.run(
         ["powershell","-Command","Get-StartApps | Sort-Object Name | ConvertTo-Json -Depth 3 | Set-Content -Path AppsList.json -Encoding UTF8"],
         text=True
     )
+
+    if result.returncode != 0:
+        print("Failed to create app list")
+        exit()
     print("Apps list created")
 
 def normalize(text):
     text=text.lower()
-    clean = ''.join(char for char in text if char.isalpha() or char == ' ')
+    clean = ''.join(char for char in text if char.isalnum() or char == ' ')
     return clean
 
 def generateAliases():
-    with open("AppsList.json","r", encoding="utf-8-sig") as f:
-        appList = json.load(f)
     for app in appList:
         text = app["Name"]
         words = text.split()
 
-        combinations = []
+        combinations = set()
 
         for i in range(len(words)):
             for j in range(i + 1, len(words) + 1):
-                combinations.append(" ".join(words[i:j]).lower())
+                combinations.add(normalize(" ".join(words[i:j])))
         
 
         for i in range(len(words)):
@@ -34,26 +41,22 @@ def generateAliases():
             suffix = words[i+1:]
 
             if suffix:
-                combinations.append(prefix.lower() + " " + " ".join(suffix).lower())
+                combinations.add(normalize(prefix + " " + " ".join(suffix)))
             else:
-                combinations.append(prefix.lower())
+                combinations.add(normalize(prefix))
 
-        app["Aliases"]=combinations
+        app["Aliases"]=list(combinations)
     
     with open("AppsList.json", "w", encoding="utf-8") as f:
         json.dump(appList, f, indent=4)
 
 def find_name(alias):
-    with open("AppsList.json","r", encoding="utf-8-sig") as f:
-        appList = json.load(f)
     for item in appList:
         if alias in item["Aliases"]:
             return item["AppID"]
     return None
 
 def fuzzyMatch(key):
-    with open("AppsList.json","r", encoding="utf-8-sig") as f:
-        appList = json.load(f)
     bestMatch = None
     bestScore = 0
 
@@ -69,6 +72,8 @@ def fuzzyMatch(key):
                 #     "score":score,
                 #     "app" : app
                 # }
+    if bestScore < 60:
+        return None
     return bestMatch
 
 def run(app):
@@ -79,24 +84,36 @@ def run(app):
     )
 
 
-
-
 if not os.path.exists("AppsList.json"):
     getAppsList()
+    
+with open("AppsList.json","r", encoding="utf-8-sig") as f:
+    appList = json.load(f)
+    if isinstance(appList, dict):
+        appList = [appList]
+
+if not all("Aliases" in app for app in appList):
     generateAliases()
 
 print("Welcome to app launcher")
 print("-"*20)
 print("(Command should be in format \"open Appname\")")
-command = input().split(" ",1)
+command = input().strip().split(" ",1)
+if command[0].lower() != "open":
+    print("Invalid command")
+    exit()
+if len(command) < 2:
+    print("Error: app name not specified")
+    exit()
+
 app=normalize(command[1])
-print(app)
 match = find_name(app)
-print(match)
 
 if(match==None):
     match = fuzzyMatch(app)
-    print(match)
+    if match is None:
+        print("App not found")
+        exit()
 
 
 run(match)
