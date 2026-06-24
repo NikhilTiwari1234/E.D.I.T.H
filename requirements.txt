@@ -1,0 +1,6 @@
+dotenv==0.9.9
+python-dotenv==1.2.2
+RapidFuzz==3.14.5
+PyAutoGUI==0.9.54
+pillow==12.2.0
+google-genai==2.9.0
