@@ -7,9 +7,16 @@ import io
 client=genai.Client(api_key=config.API_KEY)
 
 chat = client.chats.create(model=config.MODEL)
-def sendmessage(prompt):
-    response = chat.send_message(prompt)
-    return response.text
+def sendmessage(prompt,stream=False):
+    if stream:
+        response = chat.send_message_stream(prompt)
+        print("AI's Reply :",end=" ")
+        for chunk in response:
+            if chunk.text:
+                print(chunk.text, end="",flush=True)
+    else:
+        response = chat.send_message(prompt)
+        return response.text
 
 def SendPrompt(prompt,history):
     content = history + [
